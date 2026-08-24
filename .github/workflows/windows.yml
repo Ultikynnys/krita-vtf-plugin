@@ -79,6 +79,7 @@ jobs:
           cmake -S C:\krita-src -B C:\krita-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_INSTALL_PREFIX=C:\krita-install
+          -DBoost_NO_BOOST_CMAKE=ON
           -DBUILD_TESTING=OFF
           -DBUILD_KRITA_QT_DESIGNER_PLUGINS=OFF
           -DBUILD_KRITA_TESTS=OFF
