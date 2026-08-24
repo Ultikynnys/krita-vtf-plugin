@@ -57,7 +57,7 @@ jobs:
           -p "C:\Program Files\CMake\bin"
           -p "C:\ProgramData\chocolatey\bin"
           -o krita-env
-          -b %KRITA_BRANCH%
+          -b master
 
       - name: Clone matching Krita source
         shell: pwsh
