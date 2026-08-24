@@ -64,7 +64,9 @@ jobs:
         run: >-
           call C:\krita-env\krita-env.bat &&
           set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
-          set "PATH=C:\krita-env\_install\bin;%PATH%" &&
+          set "PATH=C:\krita-env\_install\bin;C:\krita-env\_install\lib;%LLVM_MINGW%\bin;%PATH%" &&
+          copy /Y "%LLVM_MINGW%\bin\libc++.dll" C:\krita-env\_install\bin\ &&
+          copy /Y "%LLVM_MINGW%\bin\libunwind.dll" C:\krita-env\_install\bin\ &&
           copy /Y "%GITHUB_WORKSPACE%\src\CMakeLists.qimageio.txt" "%GITHUB_WORKSPACE%\src\CMakeLists.txt" &&
           cmake -S "%GITHUB_WORKSPACE%\src" -B C:\vtf-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
