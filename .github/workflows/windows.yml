@@ -88,7 +88,7 @@ jobs:
         run: >-
           call C:\krita-env\krita-env.bat &&
           set "PATH=C:\krita-env\_install\bin;%LLVM_MINGW%\bin;%PATH%" &&
-          cmake --build C:\vtf-build --target test_vtf_codec --parallel 2 &&
+          cmake --build C:\vtf-build --target test_vtf_codec test_vtf_gui_dispatch --parallel 2 &&
           ctest --test-dir C:\vtf-build --output-on-failure
 
       - name: Stage artifact
