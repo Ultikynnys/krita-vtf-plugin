@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "kis_vtf_codec.h"
 #include "vtf_export_dialog.h"
+#include "vtf_gui_dispatch.h"
 
 #include <QApplication>
 #include <QImageIOHandler>
 #include <QImageIOPlugin>
+#include <QThread>
 
 class VtfHandler final : public QImageIOHandler
 {
@@ -23,10 +25,17 @@ public:
 
     bool write(const QImage &image) override
     {
-        VtfExportDialog dialog(image, QApplication::activeWindow());
-        if (dialog.exec() != QDialog::Accepted) return false;
+        bool accepted = false;
+        VtfCodec::WriteOptions options;
+        const bool dispatched = VtfGuiDispatch::runBlocking([&]() {
+            Q_ASSERT(QThread::currentThread() == qApp->thread());
+            VtfExportDialog dialog(image, QApplication::activeWindow());
+            accepted = dialog.exec() == QDialog::Accepted;
+            if (accepted) options = dialog.options();
+        });
+        if (!dispatched || !accepted) return false;
         QString error;
-        return VtfCodec::write(device(), image, dialog.options(), &error);
+        return VtfCodec::write(device(), image, options, &error);
     }
 
     QVariant option(ImageOption option) const override
