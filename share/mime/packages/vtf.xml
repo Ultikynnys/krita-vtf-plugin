@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="image/vnd.valve.source.texture">
+    <comment>Valve Texture Format</comment>
+    <acronym>VTF</acronym>
+    <glob pattern="*.vtf" weight="80"/>
+    <magic priority="80">
+      <match type="string" value="VTF\0" offset="0"/>
+    </magic>
+  </mime-type>
+</mime-info>

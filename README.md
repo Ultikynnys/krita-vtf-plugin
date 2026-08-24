@@ -135,15 +135,15 @@ These are starting points, not engine requirements. Select settings appropriate 
 - Krita installed at `C:\Program Files\Krita (x64)` by default
 - Administrator access for modifying the Krita installation
 
-### Install from GitHub Actions
+### Install
 
-1. Open the repository's **Actions** page.
-2. Select the latest successful **Windows native plugin** run.
-3. Download the `krita-vtf-windows` artifact.
-4. Extract the artifact to a writable directory.
-5. Fully close Krita.
-6. Open PowerShell as Administrator in the extracted directory.
-7. Run:
+The compiled Windows plugin is included in the repository. You do not need to build it or download a GitHub Actions artifact.
+
+1. Download the repository as a ZIP from GitHub or clone it with Git.
+2. Extract the ZIP if necessary.
+3. Fully close Krita.
+4. Open PowerShell as Administrator in the repository directory.
+5. Run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -157,6 +157,14 @@ For a non-default Krita installation, provide its root directory:
 ```
 
 Restart Krita after installation.
+
+The repository includes the complete installer payload:
+
+```text
+bin/imageformats/kimg_vtf.dll
+share/mime/packages/vtf.xml
+install.ps1
+```
 
 ### What the installer changes
 
@@ -198,6 +206,8 @@ The Windows workflow is defined in `.github/workflows/windows.yml`. It:
 4. Builds `kimg_vtf.dll`.
 5. Builds and runs the codec tests.
 6. Packages the plugin, MIME description, installer, and README as `krita-vtf-windows`.
+
+The verified CI output is committed at `bin/imageformats/kimg_vtf.dll`, making the repository ZIP directly installable. Maintainers should replace the bundled DLL after successful source changes and verify that its SHA-256 matches the corresponding CI artifact.
 
 The standalone build definition is `src/CMakeLists.qimageio.txt`. The plugin links against Qt 5 Core, Gui, and Widgets rather than Krita's private libraries.
 
