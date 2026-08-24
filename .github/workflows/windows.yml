@@ -29,7 +29,7 @@ jobs:
 
       - name: Install Python requirements
         shell: pwsh
-        run: python -m pip install python-gitlab pyyaml requests
+        run: python -m pip install python-gitlab pyyaml requests lxml packaging
 
       - name: Download LLVM MinGW
         shell: pwsh
