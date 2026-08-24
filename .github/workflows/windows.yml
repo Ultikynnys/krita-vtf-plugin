@@ -68,6 +68,10 @@ jobs:
         run: |
           Copy-Item -Recurse -Force "$env:GITHUB_WORKSPACE\src" C:\krita-src\plugins\impex\vtf
           Add-Content C:\krita-src\plugins\impex\CMakeLists.txt "`nadd_subdirectory(vtf)"
+          $rootCmake = 'C:\krita-src\CMakeLists.txt'
+          $cmake = Get-Content $rootCmake -Raw
+          $cmake = $cmake.Replace('find_package(Boost 1.65 REQUIRED COMPONENTS system)', 'find_package(Boost 1.65 REQUIRED)')
+          Set-Content $rootCmake $cmake
 
       - name: Configure Krita
         shell: cmd
