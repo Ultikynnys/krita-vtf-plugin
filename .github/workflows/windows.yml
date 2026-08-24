@@ -42,13 +42,14 @@ jobs:
       - name: Clone Krita build utilities
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force C:\krita-env | Out-Null
           git clone --depth 1 https://invent.kde.org/packaging/krita-deps-management.git C:\krita-deps
           git clone --depth 1 https://invent.kde.org/packaging/krita-ci-utilities.git C:\krita-deps\ci-utilities
 
       - name: Download official Krita dependencies
         shell: cmd
+        working-directory: C:\krita-env
         run: >-
-          mkdir C:\krita-env &&
           python C:\krita-deps\tools\setup-env.py
           --full-krita-env
           -r C:\krita-env
