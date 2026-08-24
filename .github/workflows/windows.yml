@@ -14,8 +14,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 180
     env:
-      LLVM_MINGW_VERSION: 20240619
-      LLVM_MINGW_ARCHIVE: llvm-mingw-20240619-ucrt-x86_64.zip
+      LLVM_MINGW_VERSION: 20251118
+      LLVM_MINGW_ARCHIVE: llvm-mingw-20251118-ucrt-x86_64.zip
 
     steps:
       - uses: actions/checkout@v4
@@ -68,6 +68,8 @@ jobs:
           copy /Y "%GITHUB_WORKSPACE%\src\CMakeLists.qimageio.txt" "%GITHUB_WORKSPACE%\src\CMakeLists.txt" &&
           cmake -S "%GITHUB_WORKSPACE%\src" -B C:\vtf-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER="%LLVM_MINGW%\bin\clang.exe"
+          -DCMAKE_CXX_COMPILER="%LLVM_MINGW%\bin\clang++.exe"
 
       - name: Build Qt image plugin
         shell: cmd
