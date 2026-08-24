@@ -1,0 +1,108 @@
+name: Windows native plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      KRITA_BRANCH: release/5.3.0-prealpha
+      LLVM_MINGW_VERSION: 20240619
+      LLVM_MINGW_ARCHIVE: llvm-mingw-20240619-ucrt-x86_64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Krita dependency packages
+        uses: actions/cache@v4
+        with:
+          path: C:\krita-env\cache
+          key: krita-windows-deps-${{ env.KRITA_BRANCH }}-v1
+
+      - name: Install Python requirements
+        shell: pwsh
+        run: python -m pip install python-gitlab pyyaml requests
+
+      - name: Download LLVM MinGW
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://github.com/mstorsjo/llvm-mingw/releases/download/$env:LLVM_MINGW_VERSION/$env:LLVM_MINGW_ARCHIVE" -OutFile C:\llvm-mingw.zip
+          Expand-Archive C:\llvm-mingw.zip C:\llvm-mingw
+          $toolchain = (Get-ChildItem C:\llvm-mingw -Directory | Select-Object -First 1).FullName
+          "LLVM_MINGW=$toolchain" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Clone Krita build utilities
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://invent.kde.org/packaging/krita-deps-management.git C:\krita-deps
+          git clone --depth 1 https://invent.kde.org/packaging/krita-ci-utilities.git C:\krita-deps\ci-utilities
+
+      - name: Download official Krita dependencies
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          python C:\krita-deps\tools\setup-env.py
+          --full-krita-env
+          -r C:\krita-env
+          -p "%LLVM_MINGW%\bin"
+          -p "C:\Program Files\CMake\bin"
+          -p "C:\ProgramData\chocolatey\bin"
+          -o krita-env
+          -b %KRITA_BRANCH%
+
+      - name: Clone matching Krita source
+        shell: pwsh
+        run: git clone --depth 1 --branch $env:KRITA_BRANCH https://invent.kde.org/graphics/krita.git C:\krita-src
+
+      - name: Inject VTF plugin
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse -Force "$env:GITHUB_WORKSPACE\src" C:\krita-src\plugins\impex\vtf
+          Add-Content C:\krita-src\plugins\impex\CMakeLists.txt "`nadd_subdirectory(vtf)"
+
+      - name: Configure Krita
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          call C:\krita-env\krita-env.bat &&
+          cmake -S C:\krita-src -B C:\krita-build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX=C:\krita-install
+          -DBUILD_TESTING=OFF
+          -DBUILD_KRITA_QT_DESIGNER_PLUGINS=OFF
+          -DBUILD_KRITA_TESTS=OFF
+          -DBUILD_WITH_QT6=OFF
+          -DFOUNDATION_BUILD=ON
+          -DHIDE_SAFE_ASSERTS=ON
+
+      - name: Build native VTF filters
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          call C:\krita-env\krita-env.bat &&
+          cmake --build C:\krita-build --target kritavtfimport kritavtfexport --parallel 2
+
+      - name: Stage artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifact\lib\kritaplugins | Out-Null
+          New-Item -ItemType Directory -Force artifact\share\mime\packages | Out-Null
+          Copy-Item C:\krita-build\plugins\impex\vtf\kritavtfimport.dll artifact\lib\kritaplugins\
+          Copy-Item C:\krita-build\plugins\impex\vtf\kritavtfexport.dll artifact\lib\kritaplugins\
+          Copy-Item src\vtf.xml artifact\share\mime\packages\
+          Copy-Item install.ps1 artifact\
+          Copy-Item README.md artifact\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: krita-vtf-windows
+          path: artifact
+          if-no-files-found: error

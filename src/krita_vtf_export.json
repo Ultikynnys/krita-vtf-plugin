@@ -1,0 +1,10 @@
+{
+    "Id": "Krita VTF Export Filter",
+    "NoDisplay": "true",
+    "Type": "Service",
+    "X-KDE-Export": "image/vnd.valve.source.texture",
+    "X-KDE-Library": "kritavtfexport",
+    "X-KDE-ServiceTypes": ["Krita/FileFilter"],
+    "X-KDE-Weight": 1,
+    "X-KDE-Extensions": "vtf"
+}
