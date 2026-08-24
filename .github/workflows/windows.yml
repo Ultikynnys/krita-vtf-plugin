@@ -74,6 +74,8 @@ jobs:
         working-directory: C:\krita-env
         run: >-
           call C:\krita-env\krita-env.bat &&
+          set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
+          set "PATH=C:\krita-env\_install\bin;%PATH%" &&
           cmake -S C:\krita-src -B C:\krita-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_INSTALL_PREFIX=C:\krita-install
@@ -89,6 +91,8 @@ jobs:
         working-directory: C:\krita-env
         run: >-
           call C:\krita-env\krita-env.bat &&
+          set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
+          set "PATH=C:\krita-env\_install\bin;%PATH%" &&
           cmake --build C:\krita-build --target kritavtfimport kritavtfexport --parallel 2
 
       - name: Stage artifact
