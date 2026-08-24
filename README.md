@@ -1,9 +1,13 @@
-# Native VTF import/export for Krita
+# VTF import/export for Krita
 
-Native `KisImportExportFilter` plugins that add Valve Texture Format (`.vtf`)
-to Krita's standard **File > Open** and **File > Save As** workflows.
+Adds Valve Texture Format (`.vtf`) to Krita's standard **File > Open** and
+**File > Save As** workflows on Windows.
 
-## Current format support
+The project uses a standard Qt 5 `QImageIOPlugin`, then enables the VTF MIME in
+Krita's existing QImageIO import/export bridge. This avoids linking against
+Krita's private C++ ABI.
+
+## Format support
 
 Import:
 
@@ -11,7 +15,7 @@ Import:
 - RGBA8888, ABGR8888, RGB888, BGR888, RGB565
 - I8, IA88, A8, ARGB8888, BGRA8888, BGRX8888
 - DXT1, DXT1 one-bit alpha, DXT3, DXT5
-- Reads the full-resolution mip level
+- Full-resolution mip level
 
 Export:
 
@@ -19,32 +23,33 @@ Export:
 - RGBA8888
 - One frame, one mip level, no thumbnail
 
-The exporter intentionally starts with a lossless, uncompressed profile. DXT
-compression and configurable texture flags can be added without changing the
-native Krita integration.
+## Install
 
-## Download and install
-
-1. Open the latest successful **Windows native plugin** workflow run.
-2. Download the `krita-vtf-windows` artifact.
-3. Extract it.
-4. Close Krita.
-5. Run PowerShell as Administrator:
+1. Download the `krita-vtf-windows` artifact from the latest successful
+   **Windows native plugin** GitHub Actions run.
+2. Extract the artifact.
+3. Fully close Krita.
+4. Run PowerShell as Administrator:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\install.ps1
 ```
 
-The DLLs are installed into `lib\kritaplugins`, where Krita discovers native
-file filters at startup. The MIME definition is installed under
-`share\mime\packages`.
+The installer:
 
-## Development
+- Installs `kimg_vtf.dll` into `bin\imageformats`.
+- Registers the VTF MIME for the current Windows user.
+- Makes a backup of Krita's QImageIO bridge DLLs.
+- Applies a byte-length-preserving metadata patch so Krita advertises and
+  dispatches VTF through its existing QImageIO bridge.
 
-The plugin is built inside a matching Krita source checkout because Krita does
-not publish a standalone Windows plugin SDK. GitHub Actions obtains Krita's
-official dependency environment, injects `src/` into `plugins/impex/vtf`, and
-builds only `kritavtfimport` and `kritavtfexport`.
+Restart Krita after installation. `.vtf` then works through **File > Open** and
+**File > Save As**.
+
+## CI
+
+GitHub Actions downloads Krita's official Windows Qt 5 dependency environment,
+uses the same LLVM MinGW ABI family, and builds the standalone Qt image plugin.
 
 License: GPL-2.0-or-later.

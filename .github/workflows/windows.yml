@@ -12,9 +12,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 360
+    timeout-minutes: 180
     env:
-      KRITA_BRANCH: release/5.3.0-prealpha
       LLVM_MINGW_VERSION: 20240619
       LLVM_MINGW_ARCHIVE: llvm-mingw-20240619-ucrt-x86_64.zip
 
@@ -25,7 +24,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\krita-env\cache
-          key: krita-windows-deps-${{ env.KRITA_BRANCH }}-v1
+          key: krita-windows-master-qt5-v2
 
       - name: Install Python requirements
         shell: pwsh
@@ -39,14 +38,14 @@ jobs:
           $toolchain = (Get-ChildItem C:\llvm-mingw -Directory | Select-Object -First 1).FullName
           "LLVM_MINGW=$toolchain" | Out-File $env:GITHUB_ENV -Append
 
-      - name: Clone Krita build utilities
+      - name: Clone Krita dependency utilities
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force C:\krita-env | Out-Null
           git clone --depth 1 https://invent.kde.org/packaging/krita-deps-management.git C:\krita-deps
           git clone --depth 1 https://invent.kde.org/packaging/krita-ci-utilities.git C:\krita-deps\ci-utilities
 
-      - name: Download official Krita dependencies
+      - name: Download official Krita Qt 5 dependencies
         shell: cmd
         working-directory: C:\krita-env
         run: >-
@@ -59,54 +58,32 @@ jobs:
           -o krita-env
           -b master
 
-      - name: Clone matching Krita source
-        shell: pwsh
-        run: git clone --depth 1 --branch $env:KRITA_BRANCH https://invent.kde.org/graphics/krita.git C:\krita-src
-
-      - name: Inject VTF plugin
-        shell: pwsh
-        run: |
-          Copy-Item -Recurse -Force "$env:GITHUB_WORKSPACE\src" C:\krita-src\plugins\impex\vtf
-          Add-Content C:\krita-src\plugins\impex\CMakeLists.txt "`nadd_subdirectory(vtf)"
-          $rootCmake = 'C:\krita-src\CMakeLists.txt'
-          $cmake = Get-Content $rootCmake -Raw
-          $cmake = $cmake.Replace('find_package(Boost 1.65 REQUIRED COMPONENTS system)', 'find_package(Boost 1.65 REQUIRED)')
-          Set-Content $rootCmake $cmake
-
-      - name: Configure Krita
+      - name: Configure Qt image plugin
         shell: cmd
         working-directory: C:\krita-env
         run: >-
           call C:\krita-env\krita-env.bat &&
           set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
           set "PATH=C:\krita-env\_install\bin;%PATH%" &&
-          cmake -S C:\krita-src -B C:\krita-build -G Ninja
+          copy /Y "%GITHUB_WORKSPACE%\src\CMakeLists.qimageio.txt" "%GITHUB_WORKSPACE%\src\CMakeLists.txt" &&
+          cmake -S "%GITHUB_WORKSPACE%\src" -B C:\vtf-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_INSTALL_PREFIX=C:\krita-install
-          -DBoost_NO_BOOST_CMAKE=ON
-          -DBUILD_TESTING=OFF
-          -DBUILD_KRITA_QT_DESIGNER_PLUGINS=OFF
-          -DBUILD_KRITA_TESTS=OFF
-          -DBUILD_WITH_QT6=OFF
-          -DFOUNDATION_BUILD=ON
-          -DHIDE_SAFE_ASSERTS=ON
 
-      - name: Build native VTF filters
+      - name: Build Qt image plugin
         shell: cmd
         working-directory: C:\krita-env
         run: >-
           call C:\krita-env\krita-env.bat &&
           set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
           set "PATH=C:\krita-env\_install\bin;%PATH%" &&
-          cmake --build C:\krita-build --target kritavtfimport kritavtfexport --parallel 2
+          cmake --build C:\vtf-build --target kimg_vtf --parallel 2
 
       - name: Stage artifact
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifact\lib\kritaplugins | Out-Null
+          New-Item -ItemType Directory -Force artifact\bin\imageformats | Out-Null
           New-Item -ItemType Directory -Force artifact\share\mime\packages | Out-Null
-          Copy-Item C:\krita-build\plugins\impex\vtf\kritavtfimport.dll artifact\lib\kritaplugins\
-          Copy-Item C:\krita-build\plugins\impex\vtf\kritavtfexport.dll artifact\lib\kritaplugins\
+          Copy-Item C:\vtf-build\kimg_vtf.dll artifact\bin\imageformats\
           Copy-Item src\vtf.xml artifact\share\mime\packages\
           Copy-Item install.ps1 artifact\
           Copy-Item README.md artifact\

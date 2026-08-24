@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.16)
+project(krita_vtf_qimageio LANGUAGES CXX)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui)
+
+add_library(kimg_vtf MODULE
+    kis_vtf_codec.cpp
+    kis_vtf_qimageio.cpp
+)
+target_link_libraries(kimg_vtf PRIVATE Qt5::Core Qt5::Gui)
+target_include_directories(kimg_vtf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(kimg_vtf PROPERTIES PREFIX "")
