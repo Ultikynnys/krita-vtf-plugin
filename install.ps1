@@ -26,7 +26,7 @@ if (Get-Process krita -ErrorAction SilentlyContinue) {
 
 function Add-VtfMimeToFilter([string]$Path) {
     $oldText = 'image/x-xpixmap,image/x-xbitmap,'
-    $newText = 'image/vnd.valve.source.texture,'
+    $newText = 'image/vnd.valve.source.texture,,'
     $old = [Text.Encoding]::ASCII.GetBytes($oldText)
     $new = [Text.Encoding]::ASCII.GetBytes($newText)
     if ($old.Length -ne $new.Length) {
