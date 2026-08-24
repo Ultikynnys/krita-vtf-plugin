@@ -47,7 +47,6 @@ jobs:
 
       - name: Download official Krita dependencies
         shell: cmd
-        working-directory: C:\krita-env
         run: >-
           python C:\krita-deps\tools\setup-env.py
           --full-krita-env
