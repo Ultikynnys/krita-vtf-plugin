@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "kis_vtf_codec.h"
+#include "vtf_export_dialog.h"
 
+#include <QApplication>
 #include <QImageIOHandler>
 #include <QImageIOPlugin>
 
@@ -21,8 +23,10 @@ public:
 
     bool write(const QImage &image) override
     {
+        VtfExportDialog dialog(image, QApplication::activeWindow());
+        if (dialog.exec() != QDialog::Accepted) return false;
         QString error;
-        return VtfCodec::write(device(), image, &error);
+        return VtfCodec::write(device(), image, dialog.options(), &error);
     }
 
     QVariant option(ImageOption option) const override

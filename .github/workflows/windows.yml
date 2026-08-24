@@ -82,6 +82,15 @@ jobs:
           set "PATH=C:\krita-env\_install\bin;%PATH%" &&
           cmake --build C:\vtf-build --target kimg_vtf --parallel 2
 
+      - name: Run codec tests
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          call C:\krita-env\krita-env.bat &&
+          set "PATH=C:\krita-env\_install\bin;%LLVM_MINGW%\bin;%PATH%" &&
+          cmake --build C:\vtf-build --target test_vtf_codec --parallel 2 &&
+          ctest --test-dir C:\vtf-build --output-on-failure
+
       - name: Stage artifact
         shell: pwsh
         run: |

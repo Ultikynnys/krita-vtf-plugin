@@ -10,6 +10,7 @@ install(TARGETS kritavtfimport DESTINATION ${KRITA_PLUGIN_INSTALL_DIR})
 
 set(kritavtfexport_SOURCES
     kis_vtf_export.cpp
+    kis_wdg_options_vtf.cpp
     ${kritavtfcodec_SOURCES}
 )
 kis_add_library(kritavtfexport MODULE ${kritavtfexport_SOURCES})

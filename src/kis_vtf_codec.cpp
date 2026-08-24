@@ -6,12 +6,7 @@
 
 namespace {
 
-enum ImageFormat : qint32 {
-    RGBA8888 = 0, ABGR8888 = 1, RGB888 = 2, BGR888 = 3, RGB565 = 4,
-    I8 = 5, IA88 = 6, A8 = 8, ARGB8888 = 11, BGRA8888 = 12,
-    DXT1 = 13, DXT3 = 14, DXT5 = 15, BGRX8888 = 16,
-    DXT1_ONEBITALPHA = 20, FORMAT_NONE = -1
-};
+using namespace VtfCodec;
 
 quint32 readU32(const QByteArray &data, int offset)
 {
@@ -163,6 +158,135 @@ bool decode(const QByteArray &raw, int width, int height, qint32 format, QImage 
     return true;
 }
 
+QByteArray encodeUncompressed(const QImage &image, ImageFormat format)
+{
+    QByteArray output;
+    const int size = imageSize(image.width(), image.height(), format);
+    output.reserve(size);
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            const QRgb pixel = image.pixel(x, y);
+            const uchar r = qRed(pixel), g = qGreen(pixel), b = qBlue(pixel), a = qAlpha(pixel);
+            switch (format) {
+            case RGBA8888: output.append(char(r)); output.append(char(g)); output.append(char(b)); output.append(char(a)); break;
+            case ABGR8888: output.append(char(a)); output.append(char(b)); output.append(char(g)); output.append(char(r)); break;
+            case RGB888: output.append(char(r)); output.append(char(g)); output.append(char(b)); break;
+            case BGR888: output.append(char(b)); output.append(char(g)); output.append(char(r)); break;
+            case ARGB8888: output.append(char(a)); output.append(char(r)); output.append(char(g)); output.append(char(b)); break;
+            case BGRA8888: output.append(char(b)); output.append(char(g)); output.append(char(r)); output.append(char(a)); break;
+            case BGRX8888: output.append(char(b)); output.append(char(g)); output.append(char(r)); output.append(char(255)); break;
+            case RGB565: {
+                const quint16 value = quint16((r >> 3) << 11) | quint16((g >> 2) << 5) | quint16(b >> 3);
+                output.append(char(value & 255)); output.append(char(value >> 8)); break;
+            }
+            case I8: output.append(char((int(r) + int(g) + int(b)) / 3)); break;
+            case IA88: {
+                output.append(char((int(r) + int(g) + int(b)) / 3)); output.append(char(a)); break;
+            }
+            case A8: output.append(char(a)); break;
+            default: return QByteArray();
+            }
+        }
+    }
+    return output;
+}
+
+quint16 to565(QRgb color)
+{
+    return quint16((qRed(color) >> 3) << 11) | quint16((qGreen(color) >> 2) << 5) | quint16(qBlue(color) >> 3);
+}
+
+quint32 colorDistance(QRgb a, QRgb b)
+{
+    const int dr = qRed(a) - qRed(b), dg = qGreen(a) - qGreen(b), db = qBlue(a) - qBlue(b);
+    return quint32(dr * dr + dg * dg + db * db);
+}
+
+QByteArray encodeColorBlock(const QRgb pixels[16], bool oneBitAlpha)
+{
+    int minLuma = 100000, maxLuma = -1;
+    QRgb dark = qRgb(0, 0, 0), light = qRgb(255, 255, 255);
+    for (int i = 0; i < 16; ++i) {
+        if (oneBitAlpha && qAlpha(pixels[i]) < 128) continue;
+        const int luma = qRed(pixels[i]) * 3 + qGreen(pixels[i]) * 6 + qBlue(pixels[i]);
+        if (luma < minLuma) { minLuma = luma; dark = pixels[i]; }
+        if (luma > maxLuma) { maxLuma = luma; light = pixels[i]; }
+    }
+    quint16 c0 = to565(light), c1 = to565(dark);
+    if (oneBitAlpha) {
+        if (c0 > c1) qSwap(c0, c1);
+    } else if (c0 <= c1) {
+        qSwap(c0, c1);
+        if (c0 == c1 && c0 < 65535) ++c0;
+    }
+    QRgb palette[4]; quint32 ignored;
+    uchar block[8] = {};
+    qToLittleEndian(c0, block); qToLittleEndian(c1, block + 2);
+    decodeColors(block, palette, &ignored, !oneBitAlpha);
+    quint32 indices = 0;
+    for (int i = 0; i < 16; ++i) {
+        int best = oneBitAlpha && qAlpha(pixels[i]) < 128 ? 3 : 0;
+        quint32 bestDistance = best == 3 ? 0 : colorDistance(pixels[i], palette[0]);
+        const int limit = oneBitAlpha ? 3 : 4;
+        for (int p = 1; p < limit; ++p) {
+            const quint32 distance = colorDistance(pixels[i], palette[p]);
+            if (distance < bestDistance) { bestDistance = distance; best = p; }
+        }
+        indices |= quint32(best) << (2 * i);
+    }
+    qToLittleEndian(indices, block + 4);
+    return QByteArray(reinterpret_cast<const char *>(block), 8);
+}
+
+QByteArray encodeDxt(const QImage &image, ImageFormat format)
+{
+    QByteArray output;
+    for (int by = 0; by < (image.height() + 3) / 4; ++by) {
+        for (int bx = 0; bx < (image.width() + 3) / 4; ++bx) {
+            QRgb pixels[16];
+            for (int py = 0; py < 4; ++py) for (int px = 0; px < 4; ++px) {
+                pixels[py * 4 + px] = image.pixel(qMin(bx * 4 + px, image.width() - 1),
+                                                  qMin(by * 4 + py, image.height() - 1));
+            }
+            if (format == DXT3) {
+                quint64 alpha = 0;
+                for (int i = 0; i < 16; ++i) alpha |= quint64(qAlpha(pixels[i]) >> 4) << (4 * i);
+                for (int i = 0; i < 8; ++i) output.append(char((alpha >> (8 * i)) & 255));
+            } else if (format == DXT5) {
+                int minimum = 255, maximum = 0;
+                for (const QRgb pixel : pixels) { minimum = qMin(minimum, qAlpha(pixel)); maximum = qMax(maximum, qAlpha(pixel)); }
+                output.append(char(maximum)); output.append(char(minimum));
+                int palette[8] = {maximum, minimum, 0, 0, 0, 0, 0, 0};
+                for (int i = 0; i < 6; ++i) palette[i + 2] = (maximum * (6 - i) + minimum * (i + 1)) / 7;
+                quint64 bits = 0;
+                for (int i = 0; i < 16; ++i) {
+                    int best = 0, distance = 1000;
+                    for (int p = 0; p < 8; ++p) if (qAbs(qAlpha(pixels[i]) - palette[p]) < distance) {
+                        distance = qAbs(qAlpha(pixels[i]) - palette[p]); best = p;
+                    }
+                    bits |= quint64(best) << (3 * i);
+                }
+                for (int i = 0; i < 6; ++i) output.append(char((bits >> (8 * i)) & 255));
+            }
+            output.append(encodeColorBlock(pixels, format == DXT1_ONEBITALPHA));
+        }
+    }
+    return output;
+}
+
+QByteArray encodeImage(const QImage &image, ImageFormat format)
+{
+    if (format == DXT1 || format == DXT1_ONEBITALPHA || format == DXT3 || format == DXT5) {
+        return encodeDxt(image, format);
+    }
+    return encodeUncompressed(image, format);
+}
+
+bool isPowerOfTwo(int value)
+{
+    return value > 0 && (value & (value - 1)) == 0;
+}
+
 } // namespace
 
 namespace VtfCodec {
@@ -202,36 +326,115 @@ bool read(QIODevice *device, QImage *image, QString *error)
     return decode(data.mid(offset, size), h.width, h.height, h.highFormat, image, error);
 }
 
-bool write(QIODevice *device, const QImage &source, QString *error)
+QString formatName(ImageFormat format)
+{
+    switch (format) {
+    case RGBA8888: return QStringLiteral("RGBA8888");
+    case ABGR8888: return QStringLiteral("ABGR8888");
+    case RGB888: return QStringLiteral("RGB888");
+    case BGR888: return QStringLiteral("BGR888");
+    case RGB565: return QStringLiteral("RGB565");
+    case I8: return QStringLiteral("I8");
+    case IA88: return QStringLiteral("IA88");
+    case A8: return QStringLiteral("A8");
+    case ARGB8888: return QStringLiteral("ARGB8888");
+    case BGRA8888: return QStringLiteral("BGRA8888");
+    case DXT1: return QStringLiteral("DXT1");
+    case DXT3: return QStringLiteral("DXT3");
+    case DXT5: return QStringLiteral("DXT5");
+    case BGRX8888: return QStringLiteral("BGRX8888");
+    case DXT1_ONEBITALPHA: return QStringLiteral("DXT1 One-Bit Alpha");
+    default: return QStringLiteral("Unknown");
+    }
+}
+
+bool formatSupportsAlpha(ImageFormat format)
+{
+    return format == RGBA8888 || format == ABGR8888 || format == IA88 || format == A8 ||
+           format == ARGB8888 || format == BGRA8888 || format == DXT1_ONEBITALPHA ||
+           format == DXT3 || format == DXT5;
+}
+
+bool validate(const QImage &image, const WriteOptions &options, QString *error)
+{
+    if (image.isNull() || image.width() > 65535 || image.height() > 65535) {
+        *error = QStringLiteral("VTF dimensions must be between 1 and 65535 pixels"); return false;
+    }
+    if (options.minorVersion > 5) {
+        *error = QStringLiteral("Supported VTF versions are 7.0 through 7.5"); return false;
+    }
+    if (imageSize(image.width(), image.height(), options.imageFormat) < 0) {
+        *error = QStringLiteral("Encoding %1 is not implemented").arg(formatName(options.imageFormat)); return false;
+    }
+    if (options.generateMipmaps && (!isPowerOfTwo(image.width()) || !isPowerOfTwo(image.height()))) {
+        *error = QStringLiteral("Mipmapped VTF textures must have power-of-two dimensions"); return false;
+    }
+    if ((options.flags & EnvironmentMap) && (image.width() != image.height() || !isPowerOfTwo(image.width()))) {
+        *error = QStringLiteral("Environment maps must be square and power-of-two"); return false;
+    }
+    if (options.generateThumbnail && (options.thumbnailSize == 0 || options.thumbnailSize > 64)) {
+        *error = QStringLiteral("Thumbnail size must be between 1 and 64 pixels"); return false;
+    }
+    return true;
+}
+
+bool write(QIODevice *device, const QImage &source, const WriteOptions &options, QString *error)
 {
     if (!device || !device->isWritable()) { *error = QStringLiteral("The VTF stream is not writable"); return false; }
-    if (source.isNull() || source.width() > 65535 || source.height() > 65535) {
-        *error = QStringLiteral("Invalid image dimensions for VTF"); return false;
-    }
+    if (!validate(source, options, error)) return false;
     const QImage image = source.convertToFormat(QImage::Format_RGBA8888);
+    QList<QImage> mipmaps;
+    mipmaps.append(image);
+    if (options.generateMipmaps) {
+        while (mipmaps.last().width() > 1 || mipmaps.last().height() > 1) {
+            mipmaps.append(mipmaps.last().scaled(qMax(1, mipmaps.last().width() / 2),
+                                                 qMax(1, mipmaps.last().height() / 2),
+                                                 Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+        }
+    }
+    quint32 flags = options.flags;
+    if (options.generateMipmaps) flags &= ~quint32(NoMipmaps);
+    else flags |= NoMipmaps;
+    if (formatSupportsAlpha(options.imageFormat)) {
+        flags |= options.imageFormat == DXT1_ONEBITALPHA ? OneBitAlpha : EightBitAlpha;
+    }
+    const bool thumbnail = options.generateThumbnail;
+    const int thumbSize = qMin<int>(options.thumbnailSize, qMin(image.width(), image.height()));
+    const QImage lowRes = thumbnail ? image.scaled(thumbSize, thumbSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation) : QImage();
     QByteArray header(80, '\0');
     header.replace(0, 4, QByteArray("VTF\0", 4));
     qToLittleEndian<quint32>(7, reinterpret_cast<uchar *>(header.data() + 4));
-    qToLittleEndian<quint32>(2, reinterpret_cast<uchar *>(header.data() + 8));
+    qToLittleEndian<quint32>(options.minorVersion, reinterpret_cast<uchar *>(header.data() + 8));
     qToLittleEndian<quint32>(80, reinterpret_cast<uchar *>(header.data() + 12));
     qToLittleEndian<quint16>(image.width(), reinterpret_cast<uchar *>(header.data() + 16));
     qToLittleEndian<quint16>(image.height(), reinterpret_cast<uchar *>(header.data() + 18));
-    qToLittleEndian<quint32>(0x100, reinterpret_cast<uchar *>(header.data() + 20));
+    qToLittleEndian<quint32>(flags, reinterpret_cast<uchar *>(header.data() + 20));
     qToLittleEndian<quint16>(1, reinterpret_cast<uchar *>(header.data() + 24));
-    const float bumpScale = 1.0f;
-    memcpy(header.data() + 48, &bumpScale, sizeof(float));
-    qToLittleEndian<quint32>(RGBA8888, reinterpret_cast<uchar *>(header.data() + 52));
-    header[56] = 1;
-    qToLittleEndian<quint32>(quint32(FORMAT_NONE), reinterpret_cast<uchar *>(header.data() + 57));
+    memcpy(header.data() + 48, &options.bumpScale, sizeof(float));
+    qToLittleEndian<quint32>(quint32(options.imageFormat), reinterpret_cast<uchar *>(header.data() + 52));
+    header[56] = char(mipmaps.size());
+    qToLittleEndian<quint32>(quint32(thumbnail ? DXT1 : FORMAT_NONE), reinterpret_cast<uchar *>(header.data() + 57));
+    header[61] = char(thumbnail ? thumbSize : 0);
+    header[62] = char(thumbnail ? thumbSize : 0);
     qToLittleEndian<quint16>(1, reinterpret_cast<uchar *>(header.data() + 63));
     if (device->write(header) != header.size()) { *error = QStringLiteral("Could not write VTF header"); return false; }
-    for (int y = 0; y < image.height(); ++y) {
-        const qint64 bytes = image.width() * 4;
-        if (device->write(reinterpret_cast<const char *>(image.constScanLine(y)), bytes) != bytes) {
-            *error = QStringLiteral("Could not write VTF image data"); return false;
+    if (thumbnail) {
+        const QByteArray encoded = encodeImage(lowRes, DXT1);
+        if (device->write(encoded) != encoded.size()) { *error = QStringLiteral("Could not write VTF thumbnail"); return false; }
+    }
+    for (int level = mipmaps.size() - 1; level >= 0; --level) {
+        const QByteArray encoded = encodeImage(mipmaps[level], options.imageFormat);
+        if (encoded.isEmpty() || device->write(encoded) != encoded.size()) {
+            *error = QStringLiteral("Could not encode %1 mip level %2").arg(formatName(options.imageFormat)).arg(level);
+            return false;
         }
     }
     return true;
+}
+
+bool write(QIODevice *device, const QImage &image, QString *error)
+{
+    return write(device, image, WriteOptions(), error);
 }
 
 } // namespace VtfCodec
