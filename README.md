@@ -4,6 +4,16 @@ Native Valve Texture Format (`.vtf`) support for Krita on Windows.
 
 The plugin integrates with Krita's normal **File > Open** and **File > Save As** workflows. Saving a VTF opens a dedicated export-options dialog for selecting the VTF version, image encoding, mipmaps, thumbnail, bump-map scale, and texture flags.
 
+## Screenshots
+
+### VTF export options
+
+![VTF export options dialog in Krita](docs/images/vtf-export-options.png)
+
+### VTF export preview
+
+![VTF export preview dialog in Krita](docs/images/vtf-export-preview.png)
+
 ## Features
 
 - Opens and saves `.vtf` files through Krita's standard file dialogs.
