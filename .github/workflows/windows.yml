@@ -77,6 +77,16 @@ jobs:
           -DCMAKE_C_COMPILER="%LLVM_MINGW%\bin\clang.exe"
           -DCMAKE_CXX_COMPILER="%LLVM_MINGW%\bin\clang++.exe"
 
+      - name: Inject native VTF exporter
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\krita-src\plugins\impex\vtf | Out-Null
+          Copy-Item "$env:GITHUB_WORKSPACE\*" C:\krita-src\plugins\impex\vtf -Recurse -Force
+          Add-Content C:\krita-src\plugins\impex\CMakeLists.txt "`nadd_subdirectory(vtf)"
+          if (-not (Select-String -Path C:\krita-src\plugins\impex\CMakeLists.txt -Pattern 'add_subdirectory\(vtf\)' -Quiet)) {
+            throw 'Failed to register the native VTF exporter in Krita.'
+          }
+
       - name: Configure native Krita exporter
         shell: cmd
         working-directory: C:\krita-env
@@ -84,8 +94,6 @@ jobs:
           call C:\krita-env\krita-env.bat &&
           set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
           set "PATH=C:\krita-env\_install\bin;C:\krita-env\_install\lib;%LLVM_MINGW%\bin;%PATH%" &&
-          xcopy /E /I /Y "%GITHUB_WORKSPACE%" C:\krita-src\plugins\impex\vtf &&
-          echo add_subdirectory(vtf)>> C:\krita-src\plugins\impex\CMakeLists.txt &&
           cmake -S C:\krita-src -B C:\krita-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_INSTALL_PREFIX=C:\krita-env\_install
