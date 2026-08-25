@@ -14,6 +14,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 180
     env:
+      KRITA_REVISION: 858d352
       LLVM_MINGW_VERSION: 20251118
       LLVM_MINGW_ARCHIVE: llvm-mingw-20251118-ucrt-x86_64.zip
 
@@ -24,7 +25,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\krita-env\cache
-          key: krita-windows-master-qt5-v2
+          key: krita-windows-858d352-qt5-v2
 
       - name: Install Python requirements
         shell: pwsh
@@ -60,7 +61,12 @@ jobs:
 
       - name: Clone matching Krita source
         shell: cmd
-        run: git clone --depth 1 https://invent.kde.org/graphics/krita.git C:\krita-src
+        run: >-
+          git init C:\krita-src &&
+          git -C C:\krita-src remote add origin https://invent.kde.org/graphics/krita.git &&
+          git -C C:\krita-src fetch --depth 1 origin %KRITA_REVISION% &&
+          git -C C:\krita-src checkout --detach FETCH_HEAD &&
+          git -C C:\krita-src rev-parse --verify %KRITA_REVISION%^{commit}
 
       - name: Configure Qt image plugin
         shell: cmd
