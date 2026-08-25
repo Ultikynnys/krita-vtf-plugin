@@ -169,6 +169,7 @@ bin/imageformats/kimg_vtf.dll
 bin/kritaplugins/kritavtfexport.dll
 share/mime/packages/vtf.xml
 install.ps1
+uninstall.ps1
 ```
 
 ### What the installer changes
@@ -183,6 +184,31 @@ The installer:
 - Enables VTF on Krita's QImageIO import bridge and removes any prior VTF patch from its QImageIO export bridge.
 
 The import metadata patch is necessary because Krita's generic QImageIO import bridge must advertise the VTF MIME type before it will dispatch `.vtf` files to the Qt plugin. Export deliberately bypasses QImageIO because that path receives an already-composited image and cannot preserve RGB hidden by transparency masks. The installer requires exactly one known original or patched metadata span in each bridge DLL and stops with an error if the expected layout is not found.
+
+### Uninstall
+
+Run `uninstall.ps1` from the same directory, with Krita fully closed:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\uninstall.ps1
+```
+
+For a non-default Krita installation, pass the same root you used to install:
+
+```powershell
+.\uninstall.ps1 -KritaRoot "D:\Applications\Krita"
+```
+
+The uninstaller:
+
+- Removes the installed `kimg_vtf.dll` and `kritavtfexport.dll`.
+- Removes the VTF MIME description from `%LOCALAPPDATA%\mime\packages`.
+- Restores the original MIME metadata in both Krita QImageIO bridge DLLs.
+- Removes the `.vtf` file-type registration for the current user.
+- Deletes the timestamped backup directories it created inside the Krita installation.
+
+Restart Krita after uninstalling.
 
 ## Usage
 
