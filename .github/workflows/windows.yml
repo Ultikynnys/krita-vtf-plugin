@@ -71,8 +71,10 @@ jobs:
           set "PATH=C:\krita-env\_install\bin;C:\krita-env\_install\lib;%LLVM_MINGW%\bin;%PATH%" &&
           copy /Y "%LLVM_MINGW%\bin\libc++.dll" C:\krita-env\_install\bin\ &&
           copy /Y "%LLVM_MINGW%\bin\libunwind.dll" C:\krita-env\_install\bin\ &&
-          copy /Y "%GITHUB_WORKSPACE%\src\CMakeLists.qimageio.txt" "%GITHUB_WORKSPACE%\src\CMakeLists.txt" &&
-          cmake -S "%GITHUB_WORKSPACE%\src" -B C:\vtf-build -G Ninja
+          cmake -E copy_directory "%GITHUB_WORKSPACE%\src" C:\vtf-standalone\src &&
+          cmake -E copy_directory "%GITHUB_WORKSPACE%\tests" C:\vtf-standalone\tests &&
+          copy /Y "%GITHUB_WORKSPACE%\src\CMakeLists.qimageio.txt" C:\vtf-standalone\src\CMakeLists.txt &&
+          cmake -S C:\vtf-standalone\src -B C:\vtf-build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_C_COMPILER="%LLVM_MINGW%\bin\clang.exe"
           -DCMAKE_CXX_COMPILER="%LLVM_MINGW%\bin\clang++.exe"
