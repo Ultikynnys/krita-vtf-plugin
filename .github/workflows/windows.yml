@@ -81,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force C:\krita-src\plugins\impex\vtf | Out-Null
-          Copy-Item "$env:GITHUB_WORKSPACE\*" C:\krita-src\plugins\impex\vtf -Recurse -Force
+          Copy-Item "$env:GITHUB_WORKSPACE\src\*" C:\krita-src\plugins\impex\vtf -Recurse -Force
           Add-Content C:\krita-src\plugins\impex\CMakeLists.txt "`nadd_subdirectory(vtf)"
           if (-not (Select-String -Path C:\krita-src\plugins\impex\CMakeLists.txt -Pattern 'add_subdirectory\(vtf\)' -Quiet)) {
             throw 'Failed to register the native VTF exporter in Krita.'
