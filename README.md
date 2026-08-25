@@ -134,8 +134,10 @@ These are starting points, not engine requirements. Select settings appropriate 
 ### Requirements
 
 - Windows x64
-- Krita installed at `C:\Program Files\Krita (x64)` by default
+- Krita 5.3.x, installed at `C:\Program Files\Krita (x64)` by default
 - Administrator access for modifying the Krita installation
+
+The plugin supports the Krita 5.3.x release line, including 5.3.x development and prerelease builds whose product version identifies that line. The bundled binaries were built and tested with Krita 5.3.3 revision `858d352`. For another 5.3.x build, the installer displays an untested-build warning before continuing. It rejects other Krita major/minor release lines and stops if the installed QImageIO bridge layout is not recognized.
 
 ### Install
 
@@ -241,7 +243,7 @@ ctest --test-dir C:\vtf-build --output-on-failure
 - Import returns only the largest mip level to Krita.
 - The DXT encoder prioritizes deterministic interoperable output rather than maximum compression quality.
 - Installation patches Krita's QImageIO bridge metadata and may need to be repeated after updating or reinstalling Krita.
-- The installer currently targets Windows and a Qt 5 Krita build.
+- The installer targets Windows x64 and the Krita 5.3.x release line. The bundled binaries were tested with Krita 5.3.3 revision `858d352`.
 
 Unsupported structures are not silently generated. Multi-frame, cubemap, and volume options are omitted until their data layout is implemented and tested.
 

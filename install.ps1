@@ -11,8 +11,9 @@ $sourceExporter = Join-Path $PSScriptRoot 'bin\kritaplugins\kritavtfexport.dll'
 $sourceMime = Join-Path $PSScriptRoot 'share\mime\packages\vtf.xml'
 $userMimeDir = Join-Path $env:LOCALAPPDATA 'mime\packages'
 $backupDir = Join-Path $KritaRoot ('vtf-plugin-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-$requiredKritaVersion = '5.3.3'
-$requiredKritaRevision = '858d352'
+$supportedKritaVersionPattern = '^5\.3\.\d+(?:\.\d+)*(?:[-+][0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\s+\(git\s+[0-9A-Fa-f]+\))?$'
+$supportedKritaVersionLine = '5.3.x'
+$testedKritaVersion = '5.3.3 (git 858d352)'
 $kritaExecutable = Join-Path $KritaRoot 'bin\krita.exe'
 
 if (-not (Test-Path -LiteralPath $sourcePlugin -PathType Leaf)) {
@@ -28,9 +29,11 @@ if (-not (Test-Path -LiteralPath $kritaExecutable -PathType Leaf)) {
     throw "Krita was not found at $KritaRoot"
 }
 $installedKritaVersion = (Get-Item -LiteralPath $kritaExecutable).VersionInfo.ProductVersion
-$requiredVersionText = "$requiredKritaVersion (git $requiredKritaRevision)"
-if ($installedKritaVersion -ne $requiredVersionText) {
-    throw "This native exporter requires Krita $requiredVersionText, but $installedKritaVersion is installed at $KritaRoot. Refusing to install an ABI-incompatible plugin."
+if ($installedKritaVersion -notmatch $supportedKritaVersionPattern) {
+    throw "This native exporter supports Krita $supportedKritaVersionLine, but $installedKritaVersion is installed at $KritaRoot. Refusing to install a plugin for a different Krita version line."
+}
+if ($installedKritaVersion -ne $testedKritaVersion) {
+    Write-Warning "Krita $installedKritaVersion is supported but has not been individually tested with this plugin. The tested build is Krita $testedKritaVersion."
 }
 if (Get-Process krita -ErrorAction SilentlyContinue) {
     throw 'Close Krita before installing the native VTF plugin.'
