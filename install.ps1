@@ -33,19 +33,28 @@ function Add-VtfMimeToFilter([string]$Path) {
         throw 'Internal metadata replacement lengths differ.'
     }
     $bytes = [IO.File]::ReadAllBytes($Path)
-    $matches = New-Object Collections.Generic.List[int]
-    for ($i = 0; $i -le $bytes.Length - $old.Length; $i++) {
-        $equal = $true
-        for ($j = 0; $j -lt $old.Length; $j++) {
-            if ($bytes[$i + $j] -ne $old[$j]) { $equal = $false; break }
+    function Find-ByteSequence([byte[]]$Haystack, [byte[]]$Needle) {
+        $matches = New-Object Collections.Generic.List[int]
+        for ($i = 0; $i -le $Haystack.Length - $Needle.Length; $i++) {
+            $equal = $true
+            for ($j = 0; $j -lt $Needle.Length; $j++) {
+                if ($Haystack[$i + $j] -ne $Needle[$j]) { $equal = $false; break }
+            }
+            if ($equal) { $matches.Add($i) }
         }
-        if ($equal) { $matches.Add($i) }
+        return $matches
     }
-    if ($matches.Count -ne 1) {
-        throw "Expected exactly one QImageIO MIME metadata span in $Path, found $($matches.Count)."
+    $oldMatches = @(Find-ByteSequence $bytes $old)
+    $newMatches = @(Find-ByteSequence $bytes $new)
+    if ($oldMatches.Count -eq 1 -and $newMatches.Count -eq 0) {
+        [Array]::Copy($new, 0, $bytes, $oldMatches[0], $new.Length)
+        [IO.File]::WriteAllBytes($Path, $bytes)
+        return $true
     }
-    [Array]::Copy($new, 0, $bytes, $matches[0], $new.Length)
-    [IO.File]::WriteAllBytes($Path, $bytes)
+    if ($oldMatches.Count -eq 0 -and $newMatches.Count -eq 1) {
+        return $false
+    }
+    throw "Expected one original or already-patched QImageIO MIME span in $Path; found original=$($oldMatches.Count), patched=$($newMatches.Count)."
 }
 
 New-Item -ItemType Directory -Force $imagePluginDir, $userMimeDir, $backupDir | Out-Null
