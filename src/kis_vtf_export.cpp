@@ -12,6 +12,8 @@
 #include <kis_paint_device.h>
 #include <kis_transparency_mask.h>
 
+#include <QDebug>
+
 #include <limits>
 
 K_PLUGIN_FACTORY_WITH_JSON(KisVtfExportFactory, "krita_vtf_export.json", registerPlugin<KisVtfExport>();)
@@ -42,7 +44,8 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     const QRect bounds = document->savingImage()->bounds();
     const qint64 byteCount = qint64(bounds.width()) * bounds.height() * 4;
     if (bounds.isEmpty() || byteCount > std::numeric_limits<int>::max()) {
-        return KisImportExportErrorCode(QStringLiteral("The image is too large to export as VTF"));
+        qWarning() << "The image is too large to export as VTF";
+        return ImportExportCodes::FormatFeaturesUnsupported;
     }
 
     // Alpha comes from the normal projection. RGB comes from an independent clone
@@ -61,7 +64,8 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     QImage image;
     QString error;
     if (!VtfCodec::combineBgra8888ColorAndAlpha(colorPixels, alphaPixels, bounds.size(), &image, &error)) {
-        return KisImportExportErrorCode(error);
+        qWarning() << "Failed to combine VTF RGB and alpha projections:" << error;
+        return ImportExportCodes::Failure;
     }
     VtfCodec::WriteOptions options;
     options.minorVersion = configuration->getInt("versionMinor", 2);
@@ -72,7 +76,8 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     options.thumbnailSize = quint8(configuration->getInt("thumbnailSize", 16));
     options.bumpScale = float(configuration->getDouble("bumpScale", 1.0));
     if (!VtfCodec::write(io, image, options, &error)) {
-        return KisImportExportErrorCode(error);
+        qWarning() << "Failed to write VTF:" << error;
+        return ImportExportCodes::ErrorWhileWriting;
     }
     return ImportExportCodes::OK;
 }

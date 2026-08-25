@@ -9,6 +9,8 @@
 #include <kis_paint_device.h>
 #include <kis_paint_layer.h>
 
+#include <QDebug>
+
 K_PLUGIN_FACTORY_WITH_JSON(KisVtfImportFactory, "krita_vtf_import.json", registerPlugin<KisVtfImport>();)
 
 KisVtfImport::KisVtfImport(QObject *parent, const QVariantList &)
@@ -23,7 +25,8 @@ KisImportExportErrorCode KisVtfImport::convert(KisDocument *document, QIODevice 
     QImage decoded;
     QString error;
     if (!VtfCodec::read(io, &decoded, &error)) {
-        return KisImportExportErrorCode(error);
+        qWarning() << "Failed to read VTF:" << error;
+        return ImportExportCodes::FileFormatIncorrect;
     }
 
     const KoColorSpace *colorSpace = KoColorSpaceRegistry::instance()->rgb8();
