@@ -66,7 +66,7 @@ jobs:
           git -C C:\krita-src remote add origin https://invent.kde.org/graphics/krita.git &&
           git -C C:\krita-src fetch --depth 1 origin %KRITA_REVISION% &&
           git -C C:\krita-src checkout --detach FETCH_HEAD &&
-          git -C C:\krita-src rev-parse --verify %KRITA_REVISION%^{commit}
+          git -C C:\krita-src rev-parse HEAD
 
       - name: Configure Qt image plugin
         shell: cmd
