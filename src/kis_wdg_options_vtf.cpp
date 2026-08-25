@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QScrollArea>
@@ -75,12 +76,15 @@ KisWdgOptionsVtf::KisWdgOptionsVtf(QWidget *parent)
 
     m_filterFlags = new QGroupBox(QStringLiteral("Sampling and wrapping flags"), this);
     m_usageFlags = new QGroupBox(QStringLiteral("Texture usage flags"), this);
-    auto *filterLayout = new QVBoxLayout(m_filterFlags);
-    auto *usageLayout = new QVBoxLayout(m_usageFlags);
+    auto *filterLayout = new QGridLayout(m_filterFlags);
+    auto *usageLayout = new QGridLayout(m_usageFlags);
+    const int filterCols = 2, usageCols = 3;
+    int fCol = 0, fRow = 0, uCol = 0, uRow = 0;
     for (const auto &control : controls) {
         auto *box = new QCheckBox(QString::fromLatin1(control.label), control.usage ? m_usageFlags : m_filterFlags);
         box->setObjectName(QString::fromLatin1(control.key));
-        (control.usage ? usageLayout : filterLayout)->addWidget(box);
+        if (control.usage) { usageLayout->addWidget(box, uRow, uCol); if (++uCol == usageCols) { uCol = 0; ++uRow; } }
+        else               { filterLayout->addWidget(box, fRow, fCol); if (++fCol == filterCols) { fCol = 0; ++fRow; } }
     }
     root->addWidget(m_filterFlags);
     root->addWidget(m_usageFlags);

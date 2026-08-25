@@ -6,6 +6,7 @@
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QPushButton>
@@ -35,7 +36,7 @@ VtfExportDialog::VtfExportDialog(const QImage &image, QWidget *parent)
     : QDialog(parent), m_image(image)
 {
     setWindowTitle(QStringLiteral("VTF Export Options"));
-    resize(520, 760);
+    resize(540, 620);
     auto *root = new QVBoxLayout(this);
     auto *form = new QFormLayout;
     m_version = new QComboBox(this); for (int minor = 0; minor <= 5; ++minor) m_version->addItem(QStringLiteral("VTF 7.%1").arg(minor), minor);
@@ -53,10 +54,14 @@ VtfExportDialog::VtfExportDialog(const QImage &image, QWidget *parent)
     form->addRow(QStringLiteral("Bump-map scale:"), m_bumpScale); root->addLayout(form);
     m_filterFlags = new QGroupBox(QStringLiteral("Sampling and wrapping flags"), this);
     m_usageFlags = new QGroupBox(QStringLiteral("Texture usage flags"), this);
-    auto *filterLayout = new QVBoxLayout(m_filterFlags); auto *usageLayout = new QVBoxLayout(m_usageFlags);
+    auto *filterLayout = new QGridLayout(m_filterFlags); auto *usageLayout = new QGridLayout(m_usageFlags);
+    const int filterCols = 2, usageCols = 3;
+    int fCol = 0, fRow = 0, uCol = 0, uRow = 0;
     for (const auto &control : controls) {
         auto *check = new QCheckBox(QString::fromLatin1(control.label), control.usage ? m_usageFlags : m_filterFlags);
-        check->setObjectName(QString::fromLatin1(control.key)); (control.usage ? usageLayout : filterLayout)->addWidget(check);
+        check->setObjectName(QString::fromLatin1(control.key));
+        if (control.usage) { usageLayout->addWidget(check, uRow, uCol); if (++uCol == usageCols) { uCol = 0; ++uRow; } }
+        else               { filterLayout->addWidget(check, fRow, fCol); if (++fCol == filterCols) { fCol = 0; ++fRow; } }
         connect(check, &QCheckBox::toggled, this, &VtfExportDialog::validateOptions);
     }
     root->addWidget(m_filterFlags); root->addWidget(m_usageFlags);
