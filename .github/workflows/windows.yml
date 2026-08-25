@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 180
     env:
-      KRITA_REVISION: 858d352
+      KRITA_REVISION: 858d352e52e68831693067763b9cdaf8bb9a05ce
       LLVM_MINGW_VERSION: 20251118
       LLVM_MINGW_ARCHIVE: llvm-mingw-20251118-ucrt-x86_64.zip
 
