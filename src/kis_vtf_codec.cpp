@@ -4,6 +4,8 @@
 #include <QDataStream>
 #include <QtEndian>
 
+#include <limits>
+
 namespace {
 
 using namespace VtfCodec;
@@ -290,6 +292,35 @@ bool isPowerOfTwo(int value)
 } // namespace
 
 namespace VtfCodec {
+
+bool bgra8888ToRgba8888(const QByteArray &pixels, const QSize &size, QImage *image, QString *error)
+{
+    if (!image || !error) return false;
+    const qint64 byteCount = qint64(size.width()) * size.height() * 4;
+    if (!size.isValid() || byteCount > std::numeric_limits<int>::max() || pixels.size() != byteCount) {
+        *error = QStringLiteral("The RGBA8 projection buffer has an invalid size");
+        return false;
+    }
+
+    *image = QImage(size, QImage::Format_RGBA8888);
+    if (image->isNull()) {
+        *error = QStringLiteral("Could not allocate the VTF source image");
+        return false;
+    }
+    const quint8 *source = reinterpret_cast<const quint8 *>(pixels.constData());
+    for (int y = 0; y < size.height(); ++y) {
+        quint8 *destination = image->scanLine(y);
+        for (int x = 0; x < size.width(); ++x) {
+            destination[0] = source[2];
+            destination[1] = source[1];
+            destination[2] = source[0];
+            destination[3] = source[3];
+            source += 4;
+            destination += 4;
+        }
+    }
+    return true;
+}
 
 bool read(QIODevice *device, QImage *image, QString *error)
 {

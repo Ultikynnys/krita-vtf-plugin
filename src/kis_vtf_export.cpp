@@ -5,10 +5,11 @@
 
 #include <kpluginfactory.h>
 #include <KoColorModelStandardIds.h>
-#include <KoColorConversionTransformation.h>
 #include <KisDocument.h>
 #include <kis_image.h>
 #include <kis_paint_device.h>
+
+#include <limits>
 
 K_PLUGIN_FACTORY_WITH_JSON(KisVtfExportFactory, "krita_vtf_export.json", registerPlugin<KisVtfExport>();)
 
@@ -22,10 +23,22 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
 {
     if (!configuration) configuration = defaultConfiguration(QByteArray(), QByteArray());
     const QRect bounds = document->savingImage()->bounds();
-    const QImage image = document->savingImage()->projection()->convertToQImage(
-        nullptr, 0, 0, bounds.width(), bounds.height(),
-        KoColorConversionTransformation::internalRenderingIntent(),
-        KoColorConversionTransformation::internalConversionFlags());
+    const qint64 byteCount = qint64(bounds.width()) * bounds.height() * 4;
+    if (bounds.isEmpty() || byteCount > std::numeric_limits<int>::max()) {
+        setErrorMessage(QStringLiteral("The image is too large to export as VTF"));
+        return ImportExportCodes::ErrorWhileWriting;
+    }
+
+    // The import/export pipeline supplies the RGBA8 projection advertised below in native BGRA byte order.
+    QByteArray projectionPixels(int(byteCount), Qt::Uninitialized);
+    document->savingImage()->projection()->readBytes(
+        reinterpret_cast<quint8 *>(projectionPixels.data()), bounds);
+    QImage image;
+    QString error;
+    if (!VtfCodec::bgra8888ToRgba8888(projectionPixels, bounds.size(), &image, &error)) {
+        setErrorMessage(error);
+        return ImportExportCodes::ErrorWhileWriting;
+    }
     VtfCodec::WriteOptions options;
     options.minorVersion = configuration->getInt("versionMinor", 2);
     options.imageFormat = VtfCodec::ImageFormat(configuration->getInt("imageFormat", VtfCodec::DXT5));
@@ -34,7 +47,6 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     options.generateThumbnail = configuration->getBool("generateThumbnail", true);
     options.thumbnailSize = quint8(configuration->getInt("thumbnailSize", 16));
     options.bumpScale = float(configuration->getDouble("bumpScale", 1.0));
-    QString error;
     if (!VtfCodec::write(io, image, options, &error)) {
         setErrorMessage(error);
         return ImportExportCodes::ErrorWhileWriting;

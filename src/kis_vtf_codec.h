@@ -81,6 +81,7 @@ struct WriteOptions {
 
 QString formatName(ImageFormat format);
 bool formatSupportsAlpha(ImageFormat format);
+bool bgra8888ToRgba8888(const QByteArray &pixels, const QSize &size, QImage *image, QString *error);
 bool validate(const QImage &image, const WriteOptions &options, QString *error);
 bool read(QIODevice *device, QImage *image, QString *error);
 bool write(QIODevice *device, const QImage &image, const WriteOptions &options, QString *error);
