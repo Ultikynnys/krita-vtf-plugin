@@ -23,8 +23,7 @@ KisImportExportErrorCode KisVtfImport::convert(KisDocument *document, QIODevice 
     QImage decoded;
     QString error;
     if (!VtfCodec::read(io, &decoded, &error)) {
-        setErrorMessage(error);
-        return ImportExportCodes::FileFormatIncorrect;
+        return KisImportExportErrorCode(error);
     }
 
     const KoColorSpace *colorSpace = KoColorSpaceRegistry::instance()->rgb8();

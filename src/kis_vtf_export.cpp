@@ -6,6 +6,7 @@
 #include <kpluginfactory.h>
 #include <KoColorModelStandardIds.h>
 #include <KisDocument.h>
+#include <kis_group_layer.h>
 #include <kis_image.h>
 #include <kis_node.h>
 #include <kis_paint_device.h>
@@ -17,7 +18,7 @@ K_PLUGIN_FACTORY_WITH_JSON(KisVtfExportFactory, "krita_vtf_export.json", registe
 
 namespace {
 
-void disableTransparencyMasks(const KisNodeSP &node)
+void disableTransparencyMasks(KisNodeSP node)
 {
     if (dynamic_cast<KisTransparencyMask *>(node.data())) {
         node->setVisible(false);
@@ -41,17 +42,16 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     const QRect bounds = document->savingImage()->bounds();
     const qint64 byteCount = qint64(bounds.width()) * bounds.height() * 4;
     if (bounds.isEmpty() || byteCount > std::numeric_limits<int>::max()) {
-        setErrorMessage(QStringLiteral("The image is too large to export as VTF"));
-        return ImportExportCodes::ErrorWhileWriting;
+        return KisImportExportErrorCode(QStringLiteral("The image is too large to export as VTF"));
     }
 
     // Alpha comes from the normal projection. RGB comes from an independent clone
     // composited with transparency masks disabled, so the document is never modified.
-    const KisImageSP alphaImage = document->savingImage();
+    KisImageSP alphaImage = document->savingImage();
     QByteArray alphaPixels(int(byteCount), Qt::Uninitialized);
     alphaImage->projection()->readBytes(reinterpret_cast<quint8 *>(alphaPixels.data()), bounds);
 
-    const KisImageSP colorImage = alphaImage->clone(true);
+    KisImageSP colorImage = alphaImage->clone(true);
     disableTransparencyMasks(colorImage->rootLayer());
     colorImage->rootLayer()->setDirty(bounds);
     colorImage->waitForDone();
@@ -61,8 +61,7 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     QImage image;
     QString error;
     if (!VtfCodec::combineBgra8888ColorAndAlpha(colorPixels, alphaPixels, bounds.size(), &image, &error)) {
-        setErrorMessage(error);
-        return ImportExportCodes::ErrorWhileWriting;
+        return KisImportExportErrorCode(error);
     }
     VtfCodec::WriteOptions options;
     options.minorVersion = configuration->getInt("versionMinor", 2);
@@ -73,8 +72,7 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
     options.thumbnailSize = quint8(configuration->getInt("thumbnailSize", 16));
     options.bumpScale = float(configuration->getDouble("bumpScale", 1.0));
     if (!VtfCodec::write(io, image, options, &error)) {
-        setErrorMessage(error);
-        return ImportExportCodes::ErrorWhileWriting;
+        return KisImportExportErrorCode(error);
     }
     return ImportExportCodes::OK;
 }
