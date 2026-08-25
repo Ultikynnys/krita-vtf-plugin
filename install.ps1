@@ -7,12 +7,16 @@ $ErrorActionPreference = 'Stop'
 $imagePluginDir = Join-Path $KritaRoot 'bin\imageformats'
 $kritaPluginDir = Join-Path $KritaRoot 'lib\kritaplugins'
 $sourcePlugin = Join-Path $PSScriptRoot 'bin\imageformats\kimg_vtf.dll'
+$sourceExporter = Join-Path $PSScriptRoot 'bin\kritaplugins\kritavtfexport.dll'
 $sourceMime = Join-Path $PSScriptRoot 'share\mime\packages\vtf.xml'
 $userMimeDir = Join-Path $env:LOCALAPPDATA 'mime\packages'
 $backupDir = Join-Path $KritaRoot ('vtf-plugin-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 
 if (-not (Test-Path -LiteralPath $sourcePlugin -PathType Leaf)) {
     throw "Missing build artifact: $sourcePlugin"
+}
+if (-not (Test-Path -LiteralPath $sourceExporter -PathType Leaf)) {
+    throw "Missing native exporter: $sourceExporter"
 }
 if (-not (Test-Path -LiteralPath $sourceMime -PathType Leaf)) {
     throw "Missing MIME description: $sourceMime"
@@ -24,7 +28,7 @@ if (Get-Process krita -ErrorAction SilentlyContinue) {
     throw 'Close Krita before installing the native VTF plugin.'
 }
 
-function Add-VtfMimeToFilter([string]$Path) {
+function Set-VtfMimeOnFilter([string]$Path, [bool]$Enabled) {
     $oldText = 'image/x-xpixmap,image/x-xbitmap,'
     $newText = 'image/vnd.valve.source.texture,,'
     $old = [Text.Encoding]::ASCII.GetBytes($oldText)
@@ -46,28 +50,37 @@ function Add-VtfMimeToFilter([string]$Path) {
     }
     $oldMatches = @(Find-ByteSequence $bytes $old)
     $newMatches = @(Find-ByteSequence $bytes $new)
-    if ($oldMatches.Count -eq 1 -and $newMatches.Count -eq 0) {
+    if ($Enabled -and $oldMatches.Count -eq 1 -and $newMatches.Count -eq 0) {
         [Array]::Copy($new, 0, $bytes, $oldMatches[0], $new.Length)
         [IO.File]::WriteAllBytes($Path, $bytes)
-        return $true
+        return
     }
-    if ($oldMatches.Count -eq 0 -and $newMatches.Count -eq 1) {
-        return $false
+    if (-not $Enabled -and $oldMatches.Count -eq 0 -and $newMatches.Count -eq 1) {
+        [Array]::Copy($old, 0, $bytes, $newMatches[0], $old.Length)
+        [IO.File]::WriteAllBytes($Path, $bytes)
+        return
     }
-    throw "Expected one original or already-patched QImageIO MIME span in $Path; found original=$($oldMatches.Count), patched=$($newMatches.Count)."
+    if (($Enabled -and $newMatches.Count -eq 1) -or (-not $Enabled -and $oldMatches.Count -eq 1)) {
+        return
+    }
+    throw "Expected one original or patched QImageIO MIME span in $Path; found original=$($oldMatches.Count), patched=$($newMatches.Count)."
 }
 
-New-Item -ItemType Directory -Force $imagePluginDir, $userMimeDir, $backupDir | Out-Null
+New-Item -ItemType Directory -Force $imagePluginDir, $kritaPluginDir, $userMimeDir, $backupDir | Out-Null
 Copy-Item -Force $sourcePlugin $imagePluginDir
+Copy-Item -Force $sourceExporter $kritaPluginDir
 Copy-Item -Force $sourceMime (Join-Path $userMimeDir 'vtf.xml')
 
-foreach ($name in @('kritaqimageioimport.dll', 'kritaqimageioexport.dll')) {
-    $path = Join-Path $kritaPluginDir $name
+foreach ($filter in @(
+    @{ Name = 'kritaqimageioimport.dll'; Enabled = $true },
+    @{ Name = 'kritaqimageioexport.dll'; Enabled = $false }
+)) {
+    $path = Join-Path $kritaPluginDir $filter.Name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Required Krita QImageIO bridge was not found: $path"
     }
     Copy-Item -Force $path $backupDir
-    Add-VtfMimeToFilter $path
+    Set-VtfMimeOnFilter $path $filter.Enabled
 }
 
 New-Item -Path 'HKCU:\Software\Classes\.vtf' -Force | Out-Null

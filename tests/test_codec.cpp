@@ -12,7 +12,7 @@ private Q_SLOTS:
     void versionsAndFormats_data();
     void versionsAndFormats();
     void dxtLabelsDescribeAlpha();
-    void bgraConversionPreservesTransparentRgb();
+    void combinesMasklessRgbWithRenderedAlpha();
     void mipmapsAndFlags();
     void rejectsInvalidCombinations();
 };
@@ -57,16 +57,19 @@ void TestVtfCodec::dxtLabelsDescribeAlpha()
     QCOMPARE(VtfCodec::formatName(VtfCodec::DXT5), QStringLiteral("DXT5 (interpolated alpha)"));
 }
 
-void TestVtfCodec::bgraConversionPreservesTransparentRgb()
+void TestVtfCodec::combinesMasklessRgbWithRenderedAlpha()
 {
-    const QByteArray bgra("\xcf\x65\x17\x00", 4);
+    const QByteArray colorBgra("\xcf\x65\x17\xff", 4);
+    const QByteArray alphaBgra("\x03\x02\x01\x00", 4);
     QImage image;
     QString error;
-    QVERIFY2(VtfCodec::bgra8888ToRgba8888(bgra, QSize(1, 1), &image, &error), qPrintable(error));
+    QVERIFY2(VtfCodec::combineBgra8888ColorAndAlpha(
+                 colorBgra, alphaBgra, QSize(1, 1), &image, &error), qPrintable(error));
     QCOMPARE(image.format(), QImage::Format_RGBA8888);
     QCOMPARE(image.pixel(0, 0), qRgba(23, 101, 207, 0));
 
-    QVERIFY(!VtfCodec::bgra8888ToRgba8888(QByteArray(3, '\0'), QSize(1, 1), &image, &error));
+    QVERIFY(!VtfCodec::combineBgra8888ColorAndAlpha(
+        QByteArray(3, '\0'), alphaBgra, QSize(1, 1), &image, &error));
     QVERIFY(!error.isEmpty());
 }
 

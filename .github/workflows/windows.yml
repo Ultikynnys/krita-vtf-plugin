@@ -58,6 +58,10 @@ jobs:
           -o krita-env
           -b master
 
+      - name: Clone matching Krita source
+        shell: cmd
+        run: git clone --depth 1 https://invent.kde.org/graphics/krita.git C:\krita-src
+
       - name: Configure Qt image plugin
         shell: cmd
         working-directory: C:\krita-env
@@ -73,6 +77,23 @@ jobs:
           -DCMAKE_C_COMPILER="%LLVM_MINGW%\bin\clang.exe"
           -DCMAKE_CXX_COMPILER="%LLVM_MINGW%\bin\clang++.exe"
 
+      - name: Configure native Krita exporter
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          call C:\krita-env\krita-env.bat &&
+          set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
+          set "PATH=C:\krita-env\_install\bin;C:\krita-env\_install\lib;%LLVM_MINGW%\bin;%PATH%" &&
+          xcopy /E /I /Y "%GITHUB_WORKSPACE%" C:\krita-src\plugins\impex\vtf &&
+          echo add_subdirectory(vtf)>> C:\krita-src\plugins\impex\CMakeLists.txt &&
+          cmake -S C:\krita-src -B C:\krita-build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_INSTALL_PREFIX=C:\krita-env\_install
+          -DCMAKE_C_COMPILER="%LLVM_MINGW%\bin\clang.exe"
+          -DCMAKE_CXX_COMPILER="%LLVM_MINGW%\bin\clang++.exe"
+          -DBUILD_TESTING=OFF
+          -DBUILD_KRITA_QT_DESIGNER_PLUGINS=OFF
+
       - name: Build Qt image plugin
         shell: cmd
         working-directory: C:\krita-env
@@ -81,6 +102,14 @@ jobs:
           set "CMAKE_PREFIX_PATH=C:\krita-env\_install" &&
           set "PATH=C:\krita-env\_install\bin;%PATH%" &&
           cmake --build C:\vtf-build --target kimg_vtf --parallel 2
+
+      - name: Build native Krita exporter
+        shell: cmd
+        working-directory: C:\krita-env
+        run: >-
+          call C:\krita-env\krita-env.bat &&
+          set "PATH=C:\krita-env\_install\bin;%LLVM_MINGW%\bin;%PATH%" &&
+          cmake --build C:\krita-build --target kritavtfexport --parallel 2
 
       - name: Run codec tests
         shell: cmd
@@ -95,8 +124,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifact\bin\imageformats | Out-Null
+          New-Item -ItemType Directory -Force artifact\bin\kritaplugins | Out-Null
           New-Item -ItemType Directory -Force artifact\share\mime\packages | Out-Null
           Copy-Item C:\vtf-build\kimg_vtf.dll artifact\bin\imageformats\
+          $nativeExporter = Get-ChildItem C:\krita-build -Filter kritavtfexport.dll -Recurse | Select-Object -First 1
+          if (-not $nativeExporter) { throw 'Native VTF exporter was not produced.' }
+          Copy-Item $nativeExporter.FullName artifact\bin\kritaplugins\
           Copy-Item src\vtf.xml artifact\share\mime\packages\
           Copy-Item install.ps1 artifact\
           Copy-Item README.md artifact\

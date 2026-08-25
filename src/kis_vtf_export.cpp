@@ -7,11 +7,27 @@
 #include <KoColorModelStandardIds.h>
 #include <KisDocument.h>
 #include <kis_image.h>
+#include <kis_node.h>
 #include <kis_paint_device.h>
+#include <kis_transparency_mask.h>
 
 #include <limits>
 
 K_PLUGIN_FACTORY_WITH_JSON(KisVtfExportFactory, "krita_vtf_export.json", registerPlugin<KisVtfExport>();)
+
+namespace {
+
+void disableTransparencyMasks(const KisNodeSP &node)
+{
+    if (dynamic_cast<KisTransparencyMask *>(node.data())) {
+        node->setVisible(false);
+    }
+    for (KisNodeSP child = node->firstChild(); child; child = child->nextSibling()) {
+        disableTransparencyMasks(child);
+    }
+}
+
+} // namespace
 
 KisVtfExport::KisVtfExport(QObject *parent, const QVariantList &)
     : KisImportExportFilter(parent)
@@ -29,13 +45,22 @@ KisImportExportErrorCode KisVtfExport::convert(KisDocument *document, QIODevice 
         return ImportExportCodes::ErrorWhileWriting;
     }
 
-    // The import/export pipeline supplies the RGBA8 projection advertised below in native BGRA byte order.
-    QByteArray projectionPixels(int(byteCount), Qt::Uninitialized);
-    document->savingImage()->projection()->readBytes(
-        reinterpret_cast<quint8 *>(projectionPixels.data()), bounds);
+    // Alpha comes from the normal projection. RGB comes from an independent clone
+    // composited with transparency masks disabled, so the document is never modified.
+    const KisImageSP alphaImage = document->savingImage();
+    QByteArray alphaPixels(int(byteCount), Qt::Uninitialized);
+    alphaImage->projection()->readBytes(reinterpret_cast<quint8 *>(alphaPixels.data()), bounds);
+
+    const KisImageSP colorImage = alphaImage->clone(true);
+    disableTransparencyMasks(colorImage->rootLayer());
+    colorImage->rootLayer()->setDirty(bounds);
+    colorImage->waitForDone();
+    QByteArray colorPixels(int(byteCount), Qt::Uninitialized);
+    colorImage->projection()->readBytes(reinterpret_cast<quint8 *>(colorPixels.data()), bounds);
+
     QImage image;
     QString error;
-    if (!VtfCodec::bgra8888ToRgba8888(projectionPixels, bounds.size(), &image, &error)) {
+    if (!VtfCodec::combineBgra8888ColorAndAlpha(colorPixels, alphaPixels, bounds.size(), &image, &error)) {
         setErrorMessage(error);
         return ImportExportCodes::ErrorWhileWriting;
     }

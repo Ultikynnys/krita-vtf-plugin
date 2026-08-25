@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "kis_vtf_codec.h"
-#include "vtf_export_dialog.h"
-#include "vtf_gui_dispatch.h"
 
-#include <QApplication>
 #include <QImageIOHandler>
 #include <QImageIOPlugin>
-#include <QThread>
 
 class VtfHandler final : public QImageIOHandler
 {
@@ -23,19 +19,11 @@ public:
         return VtfCodec::read(device(), image, &error);
     }
 
-    bool write(const QImage &image) override
+    bool write(const QImage &) override
     {
-        bool accepted = false;
-        VtfCodec::WriteOptions options;
-        const bool dispatched = VtfGuiDispatch::runBlocking([&]() {
-            Q_ASSERT(QThread::currentThread() == qApp->thread());
-            VtfExportDialog dialog(image, QApplication::activeWindow());
-            accepted = dialog.exec() == QDialog::Accepted;
-            if (accepted) options = dialog.options();
-        });
-        if (!dispatched || !accepted) return false;
-        QString error;
-        return VtfCodec::write(device(), image, options, &error);
+        // Krita's QImageIO bridge supplies an already-composited image, so it cannot
+        // preserve RGB hidden by transparency masks. Native Krita export handles VTF.
+        return false;
     }
 
     QVariant option(ImageOption option) const override
@@ -62,7 +50,7 @@ class VtfPlugin final : public QImageIOPlugin
 public:
     Capabilities capabilities(QIODevice *device, const QByteArray &format) const override
     {
-        if (format.toLower() == "vtf") return CanRead | CanWrite;
+        if (format.toLower() == "vtf") return CanRead;
         if (device && device->isReadable() && device->peek(4) == QByteArray("VTF\0", 4)) return CanRead;
         return {};
     }

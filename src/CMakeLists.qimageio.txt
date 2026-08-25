@@ -10,8 +10,6 @@ find_package(Qt5 5.15 REQUIRED COMPONENTS Core Gui Widgets Test Concurrent)
 add_library(kimg_vtf MODULE
     kis_vtf_codec.cpp
     kis_vtf_qimageio.cpp
-    vtf_export_dialog.cpp
-    vtf_gui_dispatch.cpp
 )
 target_link_libraries(kimg_vtf PRIVATE Qt5::Core Qt5::Gui Qt5::Widgets)
 target_include_directories(kimg_vtf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

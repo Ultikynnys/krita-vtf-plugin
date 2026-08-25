@@ -7,7 +7,9 @@ The plugin integrates with Krita's normal **File > Open** and **File > Save As**
 ## Features
 
 - Opens and saves `.vtf` files through Krita's standard file dialogs.
-- Uses a standalone Qt 5 `QImageIOPlugin` without linking against Krita's private C++ ABI.
+- Uses a standalone Qt 5 `QImageIOPlugin` for VTF import.
+- Uses a native Krita exporter to preserve RGB hidden by transparency masks.
+- Renders RGB with transparency masks disabled and takes alpha from the normal projection without modifying the document.
 - Provides a persistent VTF export-options dialog.
 - Supports compressed and uncompressed image formats.
 - Generates complete mipmap chains and low-resolution thumbnails.
@@ -162,6 +164,7 @@ The repository includes the complete installer payload:
 
 ```text
 bin/imageformats/kimg_vtf.dll
+bin/kritaplugins/kritavtfexport.dll
 share/mime/packages/vtf.xml
 install.ps1
 ```
@@ -170,13 +173,14 @@ install.ps1
 
 The installer:
 
-- Copies `kimg_vtf.dll` to Krita's `bin\imageformats` directory.
+- Copies the import-only `kimg_vtf.dll` to Krita's `bin\imageformats` directory.
+- Copies the native `kritavtfexport.dll` to Krita's `lib\kritaplugins` directory.
 - Copies the VTF MIME description to `%LOCALAPPDATA%\mime\packages\vtf.xml`.
 - Registers `.vtf` as `image/vnd.valve.source.texture` for the current Windows user.
 - Creates a timestamped backup inside the Krita installation.
-- Applies a byte-length-preserving MIME metadata patch to Krita's existing QImageIO import and export bridge DLLs.
+- Enables VTF on Krita's QImageIO import bridge and removes any prior VTF patch from its QImageIO export bridge.
 
-The metadata patch is necessary because Krita's generic QImageIO bridge must advertise the VTF MIME type before it will dispatch `.vtf` files to the Qt plugin. The installer requires exactly one known metadata span in each bridge DLL and stops with an error if the expected layout is not found.
+The import metadata patch is necessary because Krita's generic QImageIO import bridge must advertise the VTF MIME type before it will dispatch `.vtf` files to the Qt plugin. Export deliberately bypasses QImageIO because that path receives an already-composited image and cannot preserve RGB hidden by transparency masks. The installer requires exactly one known original or patched metadata span in each bridge DLL and stops with an error if the expected layout is not found.
 
 ## Usage
 
