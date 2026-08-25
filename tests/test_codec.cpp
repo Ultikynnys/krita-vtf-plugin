@@ -11,6 +11,7 @@ class TestVtfCodec : public QObject
 private Q_SLOTS:
     void versionsAndFormats_data();
     void versionsAndFormats();
+    void dxtLabelsDescribeAlpha();
     void mipmapsAndFlags();
     void rejectsInvalidCombinations();
 };
@@ -45,6 +46,14 @@ void TestVtfCodec::versionsAndFormats()
     QBuffer input(&bytes); QVERIFY(input.open(QIODevice::ReadOnly));
     QImage decoded; QVERIFY2(VtfCodec::read(&input, &decoded, &error), qPrintable(error));
     QCOMPARE(decoded.size(), image.size());
+}
+
+void TestVtfCodec::dxtLabelsDescribeAlpha()
+{
+    QCOMPARE(VtfCodec::formatName(VtfCodec::DXT1), QStringLiteral("DXT1 (no alpha)"));
+    QCOMPARE(VtfCodec::formatName(VtfCodec::DXT1_ONEBITALPHA), QStringLiteral("DXT1 (1-bit alpha)"));
+    QCOMPARE(VtfCodec::formatName(VtfCodec::DXT3), QStringLiteral("DXT3 (4-bit explicit alpha)"));
+    QCOMPARE(VtfCodec::formatName(VtfCodec::DXT5), QStringLiteral("DXT5 (interpolated alpha)"));
 }
 
 void TestVtfCodec::mipmapsAndFlags()

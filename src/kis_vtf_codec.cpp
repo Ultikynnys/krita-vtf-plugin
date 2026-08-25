@@ -339,11 +339,11 @@ QString formatName(ImageFormat format)
     case A8: return QStringLiteral("A8");
     case ARGB8888: return QStringLiteral("ARGB8888");
     case BGRA8888: return QStringLiteral("BGRA8888");
-    case DXT1: return QStringLiteral("DXT1");
-    case DXT3: return QStringLiteral("DXT3");
-    case DXT5: return QStringLiteral("DXT5");
+    case DXT1: return QStringLiteral("DXT1 (no alpha)");
+    case DXT3: return QStringLiteral("DXT3 (4-bit explicit alpha)");
+    case DXT5: return QStringLiteral("DXT5 (interpolated alpha)");
     case BGRX8888: return QStringLiteral("BGRX8888");
-    case DXT1_ONEBITALPHA: return QStringLiteral("DXT1 One-Bit Alpha");
+    case DXT1_ONEBITALPHA: return QStringLiteral("DXT1 (1-bit alpha)");
     default: return QStringLiteral("Unknown");
     }
 }
